@@ -509,6 +509,59 @@ bo_api_online() {
   printf ']}\n'
 }
 
+bo_api_traffic() {
+  local username="${1:-}" extra="${2:-}"
+  if [ -n "$username" ]; then
+    bo_api_need_no_extra "$extra" || return "$?"
+    bo_api_user_row_or_404 "$username" >/dev/null || {
+      case "$?" in
+        "$BO_API_NOT_FOUND") bo_api_error "$BO_API_NOT_FOUND" not_found "user not found" ;;
+        *) bo_api_error "$BO_API_BACKEND" backend_error "failed to read user" ;;
+      esac
+      return "$?"
+    }
+    local row u up down tot
+    if ! row="$(bo_user_traffic_row "$username" 2>/dev/null)"; then
+      bo_api_error "$BO_API_BACKEND" backend_error "failed to read user traffic"
+      return "$?"
+    fi
+    IFS=$'\t' read -r u up down tot <<<"$row"
+    printf '{"ok":true,"data":{"username":%s,"uplink_bytes":%s,"downlink_bytes":%s,"total_bytes":%s}}\n' \
+      "$(bo_api_json_string "$u")" "$up" "$down" "$tot"
+    return 0
+  fi
+
+  local user_rows user_row u row up down tot first=1
+  local total_up=0 total_down=0 total_bytes=0
+  if ! user_rows="$(bo_db_users_rows 2>/dev/null)"; then
+    bo_api_error "$BO_API_BACKEND" backend_error "failed to read users"
+    return "$?"
+  fi
+
+  local users_json=""
+  while IFS= read -r user_row; do
+    [ -n "$user_row" ] || continue
+    u="${user_row%%$'\t'*}"
+    if ! row="$(bo_user_traffic_row "$u" 2>/dev/null)"; then
+      bo_api_error "$BO_API_BACKEND" backend_error "failed to read user traffic"
+      return "$?"
+    fi
+    IFS=$'\t' read -r _ up down tot <<<"$row"
+    total_up=$((total_up + up))
+    total_down=$((total_down + down))
+    total_bytes=$((total_bytes + tot))
+    if [ "$first" = 1 ]; then
+      first=0
+    else
+      users_json="${users_json},"
+    fi
+    users_json="${users_json}{\"username\":$(bo_api_json_string "$u"),\"uplink_bytes\":$up,\"downlink_bytes\":$down,\"total_bytes\":$tot}"
+  done <<<"$user_rows"
+
+  printf '{"ok":true,"data":{"total":{"uplink_bytes":%s,"downlink_bytes":%s,"total_bytes":%s},"users":[%s]}}\n' \
+    "$total_up" "$total_down" "$total_bytes" "$users_json"
+}
+
 bo_api_cmd() {
   local cmd="${1:-}"; shift || true
   case "$cmd" in
@@ -520,6 +573,7 @@ bo_api_cmd() {
     unlock) bo_api_unlock "$@" ;;
     links) bo_api_links "$@" ;;
     online) bo_api_online "$@" ;;
+    traffic) bo_api_traffic "$@" ;;
     *) bo_api_error "$BO_API_INVALID" invalid_request "unknown api command" ;;
   esac
 }

@@ -32,6 +32,10 @@ bo_xray_user_stats() {
   if [ "${BLACKOUT_TEST_STATS_FAIL:-0}" = 1 ]; then
     return 1
   fi
+  if [ "$username" = idleuser ]; then
+    printf '{"stat":[]}\n'
+    return 0
+  fi
   if [ -f "$BLACKOUT_TEST_ONLINE_COUNTER" ]; then
     calls="$(cat "$BLACKOUT_TEST_ONLINE_COUNTER")"
   fi
@@ -81,6 +85,13 @@ out="$(expect_status 20 bo_api_cmd list)"
 [ "$(printf '%s\n' "$out" | json_get error.code)" = backend_error ]
 eval "$bo_db_users_rows_original"
 
+out="$(bo_api_cmd traffic)"
+[ "$(printf '%s\n' "$out" | json_get ok)" = True ]
+[ "$(printf '%s\n' "$out" | json_get data.total.uplink_bytes)" = 0 ]
+[ "$(printf '%s\n' "$out" | json_get data.total.downlink_bytes)" = 0 ]
+[ "$(printf '%s\n' "$out" | json_get data.total.total_bytes)" = 0 ]
+[ "$(printf '%s\n' "$out" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["data"]["users"]))')" = 0 ]
+
 out="$(bo_api_cmd create aiman 1d)"
 [ "$(printf '%s\n' "$out" | json_get ok)" = True ]
 [ "$(printf '%s\n' "$out" | json_get data.username)" = aiman ]
@@ -116,6 +127,40 @@ fi
 out="$(bo_api_cmd online 0)"
 [ "$(printf '%s\n' "$out" | json_get data.0.username)" = aiman ]
 [ "$(printf '%s\n' "$out" | json_get data.0.delta_bytes)" = 8192 ]
+
+rm -f "$BLACKOUT_TEST_ONLINE_COUNTER"
+out="$(bo_api_cmd traffic aiman)"
+[ "$(printf '%s\n' "$out" | json_get data.username)" = aiman ]
+[ "$(printf '%s\n' "$out" | json_get data.uplink_bytes)" = 1024 ]
+[ "$(printf '%s\n' "$out" | json_get data.downlink_bytes)" = 2048 ]
+[ "$(printf '%s\n' "$out" | json_get data.total_bytes)" = 3072 ]
+
+bo_api_cmd create idleuser 1d >/dev/null
+rm -f "$BLACKOUT_TEST_ONLINE_COUNTER"
+out="$(bo_api_cmd traffic)"
+[ "$(printf '%s\n' "$out" | json_get data.total.uplink_bytes)" = 1024 ]
+[ "$(printf '%s\n' "$out" | json_get data.total.downlink_bytes)" = 2048 ]
+[ "$(printf '%s\n' "$out" | json_get data.total.total_bytes)" = 3072 ]
+[ "$(printf '%s\n' "$out" | json_get data.users.0.username)" = aiman ]
+[ "$(printf '%s\n' "$out" | json_get data.users.0.total_bytes)" = 3072 ]
+[ "$(printf '%s\n' "$out" | json_get data.users.1.username)" = idleuser ]
+[ "$(printf '%s\n' "$out" | json_get data.users.1.uplink_bytes)" = 0 ]
+[ "$(printf '%s\n' "$out" | json_get data.users.1.downlink_bytes)" = 0 ]
+[ "$(printf '%s\n' "$out" | json_get data.users.1.total_bytes)" = 0 ]
+bo_api_cmd remove idleuser >/dev/null
+
+out="$(expect_status 11 bo_api_cmd traffic ghost)"
+[ "$(printf '%s\n' "$out" | json_get error.code)" = not_found ]
+
+out="$(expect_status 10 bo_api_cmd traffic aiman extra)"
+[ "$(printf '%s\n' "$out" | json_get error.code)" = invalid_request ]
+
+BLACKOUT_TEST_STATS_FAIL=1
+out="$(expect_status 20 bo_api_cmd traffic)"
+[ "$(printf '%s\n' "$out" | json_get error.code)" = backend_error ]
+out="$(expect_status 20 bo_api_cmd traffic aiman)"
+[ "$(printf '%s\n' "$out" | json_get error.code)" = backend_error ]
+unset BLACKOUT_TEST_STATS_FAIL
 
 out="$(expect_status 12 bo_api_cmd create aiman 1d)"
 [ "$(printf '%s\n' "$out" | json_get error.code)" = conflict ]

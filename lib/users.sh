@@ -314,6 +314,17 @@ bo_user_stat_value() {
   ' <<<"$stats"
 }
 
+bo_user_traffic_row() {
+  local username="$1" stats uplink downlink total
+  stats="$(bo_xray_user_stats "$username")" || return 1
+  uplink="$(bo_user_stat_value "$stats" "$username" uplink)"
+  downlink="$(bo_user_stat_value "$stats" "$username" downlink)"
+  uplink=$((uplink + 0))
+  downlink=$((downlink + 0))
+  total=$((uplink + downlink))
+  printf '%s\t%s\t%s\t%s\n' "$username" "$uplink" "$downlink" "$total"
+}
+
 bo_user_online_rows() {
   local sample username usernames before after after_uplink after_downlink delta_uplink delta_downlink delta total
   local -A before_uplink before_downlink
