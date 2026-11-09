@@ -47,7 +47,7 @@ if cmd == "create" and sys.argv[2] == "slow":
 if cmd == "create" and sys.argv[2] == "exists":
     print(json.dumps({"ok": False, "error": {"code": "conflict", "message": "exists"}}))
     sys.exit(12)
-if cmd in {"modify", "remove", "lock", "unlock", "links"} and sys.argv[2] == "ghost":
+if cmd in {"modify", "remove", "lock", "unlock", "links", "traffic"} and len(sys.argv) > 2 and sys.argv[2] == "ghost":
     print(json.dumps({"ok": False, "error": {"code": "not_found", "message": "missing"}}))
     sys.exit(11)
 if cmd == "online" and sys.argv[2] == "31":
@@ -67,6 +67,13 @@ elif cmd == "links":
     payload = [{"name": "VLESS WS TLS", "link": "vless://example"}]
 elif cmd == "online":
     payload = [{"username": "aiman", "delta_bytes": 1024, "total_bytes": 2048, "sample": int(sys.argv[2])}]
+elif cmd == "traffic" and len(sys.argv) == 2:
+    payload = {
+        "total": {"uplink_bytes": 1024, "downlink_bytes": 2048, "total_bytes": 3072},
+        "users": [{"username": "aiman", "uplink_bytes": 1024, "downlink_bytes": 2048, "total_bytes": 3072}],
+    }
+elif cmd == "traffic" and len(sys.argv) == 3:
+    payload = {"username": sys.argv[2], "uplink_bytes": 1024, "downlink_bytes": 2048, "total_bytes": 3072}
 else:
     print(json.dumps({"ok": False, "error": {"code": "invalid_request", "message": "bad command"}}))
     sys.exit(10)
@@ -206,6 +213,10 @@ print(json.dumps({"ok": True, "data": payload}))
         self.assertEqual(status, 404)
         self.assertEqual(payload["error"]["code"], "not_found")
 
+        status, payload, _ = self.request("GET", "/blackout-api/v1/users/ghost/traffic")
+        self.assertEqual(status, 404)
+        self.assertEqual(payload["error"]["code"], "not_found")
+
         status, payload, _ = self.request("POST", "/blackout-api/v1/users", {"username": "boom", "duration": "1d"})
         self.assertEqual(status, 500)
         self.assertEqual(payload["error"]["code"], "backend_error")
@@ -240,9 +251,26 @@ print(json.dumps({"ok": True, "data": payload}))
         self.assertEqual(status, 200)
         self.assertEqual(payload["data"][0]["sample"], 7)
 
+        status, payload, _ = self.request("GET", "/blackout-api/v1/traffic")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["data"]["total"]["total_bytes"], 3072)
+        self.assertEqual(payload["data"]["users"][0]["username"], "aiman")
+
+        status, payload, _ = self.request("GET", "/blackout-api/v1/users/aiman/traffic")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["data"]["username"], "aiman")
+        self.assertEqual(payload["data"]["total_bytes"], 3072)
+
         self.assertEqual(
             self.calls(),
-            [["lock", "aiman"], ["unlock", "aiman"], ["links", "aiman"], ["online", "7"]],
+            [
+                ["lock", "aiman"],
+                ["unlock", "aiman"],
+                ["links", "aiman"],
+                ["online", "7"],
+                ["traffic"],
+                ["traffic", "aiman"],
+            ],
         )
 
     def test_online_sample_is_limited_to_one_through_thirty(self):

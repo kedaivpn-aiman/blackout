@@ -74,7 +74,9 @@ DELETE /users/{username}
 POST   /users/{username}/lock
 POST   /users/{username}/unlock
 GET    /users/{username}/links
+GET    /users/{username}/traffic
 GET    /users/online?sample=5
+GET    /traffic
 ```
 
 `sample` for online users must be from `1` through `30`.
@@ -129,6 +131,13 @@ Links and online users:
 ```bash
 curl -sS -H "$AUTH" "$BASE/users/aiman/links"
 curl -sS -H "$AUTH" "$BASE/users/online?sample=5"
+```
+
+Traffic usage:
+
+```bash
+curl -sS -H "$AUTH" "$BASE/traffic"
+curl -sS -H "$AUTH" "$BASE/users/aiman/traffic"
 ```
 
 ## Responses

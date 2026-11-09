@@ -203,8 +203,14 @@ class BlackoutApiHandler(BaseHTTPRequestHandler):
                 return
             self.adapter_response(["online", sample])
             return
+        if parts == ["traffic"]:
+            self.adapter_response(["traffic"])
+            return
         if len(parts or []) == 3 and parts[0] == "users" and parts[2] == "links":
             self.adapter_response(["links", parts[1]])
+            return
+        if len(parts or []) == 3 and parts[0] == "users" and parts[2] == "traffic":
+            self.adapter_response(["traffic", parts[1]])
             return
         self.not_found()
 
