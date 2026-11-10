@@ -467,3 +467,154 @@ Restores proxy access for a previously locked user by injecting their credential
 curl -sS -X POST https://$DOMAIN/blackout-api/v1/users/aiman/unlock \
   -H "Authorization: Bearer $BLACKOUT_API_TOKEN"
 ```
+
+---
+
+## Client Provisioning Endpoints
+
+### Get Client Connection Links
+
+`GET /blackout-api/v1/users/{username}/links`
+
+Generates ready-to-import client proxy configurations (such as VLESS over WebSocket with TLS) for a specific user.
+
+- **Headers:**
+  - `Authorization: Bearer <TOKEN>`
+- **Path Parameters:**
+  - `username` (string, required): Target user to generate links for.
+- **Request Body:** None
+- **Response:** `200 OK`
+
+```json
+{
+  "ok": true,
+  "data": [
+    {
+      "name": "VLESS WS TLS",
+      "link": "vless://4f9b8608-8e7c-48c9-83bc-69ff15bfbaec@example.com:443?type=ws&security=tls&path=%2Fblackout-ws#aiman-VLESS-WS-TLS"
+    }
+  ]
+}
+```
+
+- **Error Codes:** `unauthorized` (401), `not_found` (404), `backend_error` (500).
+
+```bash
+curl -sS -H "Authorization: Bearer $BLACKOUT_API_TOKEN" \
+  https://$DOMAIN/blackout-api/v1/users/aiman/links
+```
+
+---
+
+## Metrics & Observability Endpoints
+
+### Get User Traffic Usage
+
+`GET /blackout-api/v1/users/{username}/traffic`
+
+Queries cumulative byte counters (uplink, downlink, total) consumed by a specific user.
+
+- **Headers:**
+  - `Authorization: Bearer <TOKEN>`
+- **Path Parameters:**
+  - `username` (string, required): Target user to retrieve traffic for.
+- **Request Body:** None
+- **Response:** `200 OK`
+
+```json
+{
+  "ok": true,
+  "data": {
+    "username": "aiman",
+    "uplink_bytes": 1048576,
+    "downlink_bytes": 5242880,
+    "total_bytes": 6291456
+  }
+}
+```
+
+- **Error Codes:** `unauthorized` (401), `not_found` (404), `backend_error` (500).
+
+```bash
+curl -sS -H "Authorization: Bearer $BLACKOUT_API_TOKEN" \
+  https://$DOMAIN/blackout-api/v1/users/aiman/traffic
+```
+
+---
+
+### Get Global Traffic Usage
+
+`GET /blackout-api/v1/traffic`
+
+Retrieves global server traffic sums and a detailed per-user traffic usage breakdown. Note that unlike the single-user endpoint which returns a flat statistics object, the global endpoint encapsulates aggregate counters in a `total` object alongside a `users` array.
+
+- **Headers:**
+  - `Authorization: Bearer <TOKEN>`
+- **Request Body:** None
+- **Response:** `200 OK`
+
+```json
+{
+  "ok": true,
+  "data": {
+    "total": {
+      "uplink_bytes": 10485760,
+      "downlink_bytes": 52428800,
+      "total_bytes": 62914560
+    },
+    "users": [
+      {
+        "username": "aiman",
+        "uplink_bytes": 1048576,
+        "downlink_bytes": 5242880,
+        "total_bytes": 6291456
+      }
+    ]
+  }
+}
+```
+
+- **Error Codes:** `unauthorized` (401), `backend_error` (500).
+
+```bash
+curl -sS -H "Authorization: Bearer $BLACKOUT_API_TOKEN" \
+  https://$DOMAIN/blackout-api/v1/traffic
+```
+
+---
+
+### Get Online Users
+
+`GET /blackout-api/v1/users/online`
+
+Samples active client traffic over an observation window to identify clients currently connected and streaming data through Xray.
+
+- **Headers:**
+  - `Authorization: Bearer <TOKEN>`
+- **Query Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  |-----------|------|----------|---------|-------------|
+  | `sample` | integer | No | `5` | Sampling window duration in seconds. Must be an integer between 1 and 30 (`1 <= sample <= 30`). |
+
+- **Request Body:** None
+- **Response:** `200 OK`
+
+```json
+{
+  "ok": true,
+  "data": [
+    {
+      "username": "aiman",
+      "delta_bytes": 10240,
+      "total_bytes": 6291456
+    }
+  ]
+}
+```
+
+- **Error Codes:** `invalid_request` (400) if `sample` is not an integer or outside the 1–30 range, `unauthorized` (401), `backend_error` (500).
+
+```bash
+curl -sS -H "Authorization: Bearer $BLACKOUT_API_TOKEN" \
+  "https://$DOMAIN/blackout-api/v1/users/online?sample=5"
+```
