@@ -59,9 +59,10 @@ class TestDocsApi(unittest.TestCase):
     def test_review_focus_items_documented(self):
         self.assertIn("204 No Content", self.text)
         self.assertIn("sample", self.text)
-        self.assertIn("30", self.text)
+        self.assertIn("1 <= sample <= 30", self.text)
         self.assertIn("never", self.text)
         self.assertIn("serialized", self.text.lower())
+        self.assertIn("minutes are not supported", self.text.lower())
 
 
 if __name__ == "__main__":

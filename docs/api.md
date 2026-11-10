@@ -83,7 +83,11 @@ Rotating the token restarts the `blackout-api` service automatically. Any panels
 - **Content Negotiation:** All requests with payloads must specify `Content-Type: application/json`.
 - **Payload Limits:** Maximum request body size is 64 KB (65,536 bytes). Requests exceeding this limit return `413 Payload Too Large` with error code `request_too_large`.
 - **Concurrency & Concurrency Locking:** User mutations (`POST`, `PATCH`, `DELETE`, lock, unlock) are serialized internally using a synchronization lock to prevent SQLite and Xray state race conditions.
-- **Duration Syntax:** User expiration durations accept human-readable relative units (`12h`, `7d`, `30d`, `1m`) or the literal string `"never"` for non-expiring accounts.
+- **Duration Syntax:** User expiration durations accept positive integer values combined with a unit identifier or the literal string `"never"`:
+  - `h`: Hours (e.g. `12h` = 43,200 seconds).
+  - `d`: Days (e.g. `7d`, `30d` = 86,400 seconds per day).
+  - `m`: Months (defined as 30-day periods, e.g. `1m` = 2,592,000 seconds). *Note: Minutes are not supported.*
+  - `"never"`: Non-expiring account (sets `expires_at` to the sentinel epoch `4102444800`, year 2100).
 
 ### Standard Response Envelope
 
