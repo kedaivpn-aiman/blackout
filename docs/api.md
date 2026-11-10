@@ -236,11 +236,234 @@ Represents an active client observed during a traffic sampling window.
 
 ---
 
-## API Endpoints
+## User Lifecycle Endpoints
 
-Wait, to keep tests in partial progress, we don't have all detailed endpoint sections yet.
-Wait, let's see what Step 4 expects:
-"Run: `python3 -m unittest tests/test_docs_api.py -v`
-Expected: `test_all_error_codes_documented` and `test_core_data_models_documented` PASS; endpoint checks pending."
+### List All Users
 
-Let's test this right now.
+`GET /blackout-api/v1/users`
+
+Retrieves a list of all provisioned proxy users along with their statuses and timestamps.
+
+- **Headers:**
+  - `Authorization: Bearer <TOKEN>`
+- **Request Body:** None
+- **Response:** `200 OK`
+
+```json
+{
+  "ok": true,
+  "data": [
+    {
+      "username": "aiman",
+      "uuid": "4f9b8608-8e7c-48c9-83bc-69ff15bfbaec",
+      "level": 0,
+      "status": "active",
+      "created_at": 1700000000,
+      "expires_at": 1702592000,
+      "updated_at": 1700000000
+    }
+  ]
+}
+```
+
+- **Error Codes:** `unauthorized` (401), `backend_error` (500).
+
+```bash
+curl -sS -H "Authorization: Bearer $BLACKOUT_API_TOKEN" \
+  https://$DOMAIN/blackout-api/v1/users
+```
+
+---
+
+### Create User
+
+`POST /blackout-api/v1/users`
+
+Provisions a new user account, assigns a fresh UUID, calculates expiry, and activates the user in the running Xray instance.
+
+- **Headers:**
+  - `Authorization: Bearer <TOKEN>`
+  - `Content-Type: application/json`
+- **Request Body:**
+  | Field | Type | Required | Description |
+  |-------|------|----------|-------------|
+  | `username` | string | Yes | Unique alphanumeric username. |
+  | `duration` | string | Yes | Relative duration (e.g. `12h`, `7d`, `30d`, `1m`) or `"never"`. |
+
+```json
+{
+  "username": "aiman",
+  "duration": "30d"
+}
+```
+
+- **Response:** `201 Created`
+
+```json
+{
+  "ok": true,
+  "data": {
+    "username": "aiman",
+    "uuid": "4f9b8608-8e7c-48c9-83bc-69ff15bfbaec",
+    "level": 0,
+    "status": "active",
+    "created_at": 1700000000,
+    "expires_at": 1702592000,
+    "updated_at": 1700000000
+  }
+}
+```
+
+- **Error Codes:** `invalid_request` (400), `unauthorized` (401), `conflict` (409), `request_too_large` (413), `backend_error` (500).
+
+```bash
+curl -sS -X POST https://$DOMAIN/blackout-api/v1/users \
+  -H "Authorization: Bearer $BLACKOUT_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"aiman","duration":"30d"}'
+```
+
+---
+
+### Modify User Duration
+
+`PATCH /blackout-api/v1/users/{username}`
+
+Modifies the active access duration and recalculates the expiration timestamp for an existing user.
+
+- **Headers:**
+  - `Authorization: Bearer <TOKEN>`
+  - `Content-Type: application/json`
+- **Path Parameters:**
+  - `username` (string, required): Alphanumeric username of the target account.
+- **Request Body:**
+  | Field | Type | Required | Description |
+  |-------|------|----------|-------------|
+  | `duration` | string | Yes | Relative duration (e.g. `12h`, `7d`, `30d`, `1m`) or `"never"`. |
+
+```json
+{
+  "duration": "7d"
+}
+```
+
+- **Response:** `200 OK`
+
+```json
+{
+  "ok": true,
+  "data": {
+    "username": "aiman",
+    "uuid": "4f9b8608-8e7c-48c9-83bc-69ff15bfbaec",
+    "level": 0,
+    "status": "active",
+    "created_at": 1700000000,
+    "expires_at": 1700604800,
+    "updated_at": 1700003600
+  }
+}
+```
+
+- **Error Codes:** `invalid_request` (400), `unauthorized` (401), `not_found` (404), `request_too_large` (413), `backend_error` (500).
+
+```bash
+curl -sS -X PATCH https://$DOMAIN/blackout-api/v1/users/aiman \
+  -H "Authorization: Bearer $BLACKOUT_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"duration":"7d"}'
+```
+
+---
+
+### Delete User
+
+`DELETE /blackout-api/v1/users/{username}`
+
+Deletes a user account, removes proxy credentials from the Xray core, and purges the user from the database.
+
+- **Headers:**
+  - `Authorization: Bearer <TOKEN>`
+- **Path Parameters:**
+  - `username` (string, required): Alphanumeric username of target account.
+- **Request Body:** None
+- **Response:** `204 No Content` (empty body)
+- **Error Codes:** `unauthorized` (401), `not_found` (404), `backend_error` (500).
+
+```bash
+curl -sS -X DELETE https://$DOMAIN/blackout-api/v1/users/aiman \
+  -H "Authorization: Bearer $BLACKOUT_API_TOKEN"
+```
+
+---
+
+### Lock User
+
+`POST /blackout-api/v1/users/{username}/lock`
+
+Suspends a user's proxy access immediately by removing credentials from the Xray core while setting their status to `"locked"`.
+
+- **Headers:**
+  - `Authorization: Bearer <TOKEN>`
+- **Path Parameters:**
+  - `username` (string, required): Target user to lock.
+- **Request Body:** None
+- **Response:** `200 OK`
+
+```json
+{
+  "ok": true,
+  "data": {
+    "username": "aiman",
+    "uuid": "4f9b8608-8e7c-48c9-83bc-69ff15bfbaec",
+    "level": 0,
+    "status": "locked",
+    "created_at": 1700000000,
+    "expires_at": 1702592000,
+    "updated_at": 1700005000
+  }
+}
+```
+
+- **Error Codes:** `unauthorized` (401), `not_found` (404), `backend_error` (500).
+
+```bash
+curl -sS -X POST https://$DOMAIN/blackout-api/v1/users/aiman/lock \
+  -H "Authorization: Bearer $BLACKOUT_API_TOKEN"
+```
+
+---
+
+### Unlock User
+
+`POST /blackout-api/v1/users/{username}/unlock`
+
+Restores proxy access for a previously locked user by injecting their credentials back into Xray core and updating their status to `"active"`.
+
+- **Headers:**
+  - `Authorization: Bearer <TOKEN>`
+- **Path Parameters:**
+  - `username` (string, required): Target user to unlock.
+- **Request Body:** None
+- **Response:** `200 OK`
+
+```json
+{
+  "ok": true,
+  "data": {
+    "username": "aiman",
+    "uuid": "4f9b8608-8e7c-48c9-83bc-69ff15bfbaec",
+    "level": 0,
+    "status": "active",
+    "created_at": 1700000000,
+    "expires_at": 1702592000,
+    "updated_at": 1700006000
+  }
+}
+```
+
+- **Error Codes:** `unauthorized` (401), `not_found` (404), `backend_error` (500).
+
+```bash
+curl -sS -X POST https://$DOMAIN/blackout-api/v1/users/aiman/unlock \
+  -H "Authorization: Bearer $BLACKOUT_API_TOKEN"
+```
